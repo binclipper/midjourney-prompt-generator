@@ -1,0 +1,1539 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Midjourneyスタイルプロンプトジェネレーター</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: "Inter", sans-serif;
+            background-color: #1a202c; /* Dark background */
+            color: #e2e8f0; /* Light text */
+        }
+        .container {
+            max-width: 960px;
+        }
+        .section-title {
+            border-bottom: 2px solid #4a5568;
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+            color: #a0aec0;
+        }
+        .radio-group label, .checkbox-group label {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            background-color: #2d3748;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 0.5rem;
+            border: 1px solid transparent;
+        }
+        .radio-group input:checked + label, .checkbox-group input:checked + label {
+            background-color: #4299e1; /* Blue for selected */
+            color: white;
+            border-color: #3182ce;
+        }
+        .radio-group label:hover, .checkbox-group label:hover {
+            background-color: #4a5568;
+        }
+        .radio-group input, .checkbox-group input {
+            display: none; /* Hide native radio/checkbox */
+        }
+        .prompt-output {
+            background-color: #2d3748;
+            border: 1px solid #4a5568;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+            min-height: 100px;
+            overflow-y: auto;
+        }
+        .copy-button {
+            background-color: #4299e1;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+        .copy-button:hover {
+            background-color: #3182ce;
+        }
+        .message-box {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #48bb78; /* Green for success */
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+            z-index: 1000;
+        }
+        .message-box.show {
+            opacity: 1;
+        }
+        /* Aspect Ratio Preview Styles */
+        .aspect-ratio-preview-container {
+            width: 200px; /* Fixed width */
+            height: 150px; /* Fixed height */
+            margin: 0 auto 1rem auto; /* Center and add margin */
+            background-color: #4a5568; /* Background for the container */
+            border-radius: 0.5rem;
+            display: flex; /* Flexbox for centering inner box */
+            align-items: center;
+            justify-content: center;
+            overflow: hidden; /* Ensure inner content respects border-radius */
+            padding: 0.5rem; /* Padding around the inner box */
+        }
+        .aspect-ratio-box {
+            background-color: #3182ce; /* Blue box */
+            border: 2px solid #a0aec0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            color: white;
+            font-weight: bold;
+            border-radius: 0.25rem; /* Slightly rounded corners for the box */
+            flex-shrink: 0; /* Prevent shrinking */
+        }
+        /* Slider specific styles */
+        .slider-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            padding-bottom: 0.5rem;
+        }
+        .slider-wrapper .relative {
+            height: 32px;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .slider-wrapper input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #4a5568;
+            outline: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 10;
+        }
+        .slider-wrapper input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #4299e1;
+            cursor: pointer;
+            border: 2px solid #a0aec0;
+        }
+        .slider-wrapper input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #4299e1;
+            cursor: pointer;
+            border: 2px solid #a0aec0;
+        }
+        .slider-label {
+            font-size: 1rem;
+            font-weight: bold;
+            color: #e2e8f0;
+            margin-top: 0.5rem;
+        }
+        .slider-ticks {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 100%;
+            height: 20px;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .tick-mark {
+            position: absolute;
+            top: 0;
+            width: 2px;
+            height: 100%;
+            background-color: #a0aec0;
+            transform: translateX(-50%);
+        }
+
+        /* Styles for lighting visual buttons (no hidden radio input) */
+        .lighting-visual-button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
+        }
+        .lighting-visual-button-group .visual-button {
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.5rem;
+            background-color: #2d3748;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            position: relative;
+            overflow: hidden;
+            font-size: 0.75rem;
+            font-weight: bold;
+            color: #e2e8f0;
+            text-align: center;
+        }
+        .lighting-visual-button-group .visual-button.selected {
+            background-color: #4299e1;
+            color: white;
+            border-color: #3182ce;
+        }
+        .lighting-visual-button-group .visual-button:hover {
+            background-color: #4a5568;
+        }
+
+        /* Style for hint text */
+        .individual-hint-panel { /* Individual hint panel style */
+            font-size: 0.85rem;
+            color: #a0aec0;
+            margin-top: 0.5rem;
+            padding: 0.75rem;
+            background-color: #2d3748;
+            border-radius: 0.5rem;
+            border: 1px solid #4a5568;
+            min-height: 40px; /* Ensure it has some height even when empty */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .individual-hint-description {
+            color: #e2e8f0; /* Brighter for description */
+            margin-bottom: 0.25rem;
+        }
+        .individual-hint-prompt {
+            font-size: 0.75rem;
+            color: #9ca3af; /* Thin for prompt */
+            font-family: monospace;
+            background-color: #1f2937; /* Even darker background */
+            padding: 0.2rem 0.4rem;
+            border-radius: 0.25rem;
+            word-break: break-all; /* Break long prompts */
+        }
+        .option-label-container {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start; /* Left align */
+            width: 100%; /* Match parent width */
+        }
+        .option-label-text {
+            margin-bottom: 0; /* No space needed here, hint is separate */
+        }
+    </style>
+</head>
+<body class="p-6">
+    <div class="container mx-auto bg-gray-800 p-8 rounded-lg shadow-lg">
+        <h1 class="text-3xl font-bold text-center mb-8 text-blue-400">Midjourneyスタイルプロンプトジェネレーター</h1>
+
+        <div id="controls-container" class="space-y-6">
+            <!-- UI elements will be dynamically generated here -->
+        </div>
+
+        <!-- Base Prompt Input Form -->
+        <div class="mt-8 mb-4">
+            <h2 class="text-xl font-semibold section-title mb-4">生成するプロンプトの元になるテキスト</h2>
+            <textarea id="base-prompt-input" class="w-full p-3 rounded-md bg-gray-700 border border-gray-600 text-white placeholder-gray-400" rows="3" placeholder="例: a girl walking in a park"></textarea>
+        </div>
+
+        <div class="mt-8">
+            <h2 class="text-xl font-semibold section-title mb-4">生成されたプロンプト</h2>
+            <div id="prompt-output" class="prompt-output mb-4">
+                ここにプロンプトが表示されます。
+            </div>
+            <button id="copy-button" class="copy-button w-full">プロンプトをコピー</button>
+        </div>
+    </div>
+
+    <div id="message-box" class="message-box"></div>
+
+    <script>
+        const styleConfig = {
+            "プリセット": { // New section for presets
+                "type": "preset-radio", // Custom type for presets
+                "options": {
+                    "ポートレート向け (人物強調)": {
+                        "description": "人物を際立たせ、背景を大きくぼかす、明るく自然なポートレート。",
+                        "selections": {
+                            "写真の目的/スタイル": "明るく希望に満ちた",
+                            "背景のぼかし具合": "大きくぼかす (被写体強調)",
+                            "写真の質感": "現実に近いリアルさ",
+                            "光の当たり方": "自然光",
+                            "写真の色合い": "標準的な色",
+                            "使用カメラの雰囲気": "Canonのカメラ",
+                            "カメラ機種": "EOS R5", // 具体的な機種もプリセットに含める
+                            "レンズの雰囲気/写る範囲": "人物を際立たせるレンズ (85mm)",
+                            "写真家/映像監督のスタイル": "アニー・リーボヴィッツ風",
+                            "アスペクト比": 8, // 2:3 (ポートレート向け)
+                            "被写体の見せ方/構図": ["クローズアップで強調", "全身を写す"],
+                            "撮影テクニック": ["固定撮影風"],
+                            "時間帯と光の状況": "昼間",
+                            "天気と環境": ["晴れ"],
+                            "解像度と品質": "高画質",
+                            "特殊な視覚効果": []
+                        }
+                    },
+                    "風景写真向け (全体シャープ)": {
+                        "description": "手前から奥まで全体にピントが合い、広大な景色を鮮明に捉える風景写真。",
+                        "selections": {
+                            "写真の目的/スタイル": "National Geographicドキュメンタリー雑誌の表紙風",
+                            "背景のぼかし具合": "全体をシャープに (風景・記録向け)",
+                            "写真の質感": "超高精細なディテール",
+                            "光の当たり方": "自然光",
+                            "写真の色合い": "標準的な色",
+                            "使用カメラの雰囲気": "Nikonのカメラ",
+                            "カメラ機種": "Z 9",
+                            "レンズの雰囲気/写る範囲": "広々とした風景を撮るレンズ",
+                            "写真家/映像監督のスタイル": "指定なし",
+                            "アスペクト比": 1, // 16:9
+                            "被写体の見せ方/構図": ["広大な景色と共に"],
+                            "撮影テクニック": ["固定撮影風"],
+                            "時間帯と光の状況": "昼間",
+                            "天気と環境": ["晴れ"],
+                            "解像度と品質": "8K品質",
+                            "特殊な視覚効果": []
+                        }
+                    },
+                    "映画のワンシーン (ドラマチック)": {
+                        "description": "ドラマチックな光と影、物語性を感じる映画のような雰囲気のシーン。",
+                        "selections": {
+                            "写真の目的/スタイル": "映画のワンシーンのように",
+                            "背景のぼかし具合": "少しぼかす (映画的表現)",
+                            "写真の質感": "現実に近いリアルさ",
+                            "光の当たり方": "ドラマチックな光",
+                            "写真の色合い": "高コントラスト",
+                            "使用カメラの雰囲気": "Sonyのカメラ",
+                            "カメラ機種": "Alpha 7 IV",
+                            "レンズの雰囲気/写る範囲": "自然な視点で撮るレンズ (35mm)",
+                            "写真家/映像監督のスタイル": "ロジャー・ディーキンス風",
+                            "アスペクト比": 0, // 2:1
+                            "被写体の見せ方/構図": ["側面から"],
+                            "撮影テクニック": ["ドリー (前後移動)"],
+                            "時間帯と光の状況": "夕暮れ時",
+                            "天気と環境": [],
+                            "解像度と品質": "4K品質",
+                            "特殊な視覚効果": ["粒子表現"]
+                        }
+                    },
+                    "週刊漫画雑誌グラビア (アイドル風)": {
+                        "description": "週刊漫画雑誌の表紙のような、鮮やかで躍動感のある女性モデルのグラビア写真。",
+                        "selections": {
+                            "写真の目的/スタイル": "週刊の漫画雑誌の表紙風",
+                            "背景のぼかし具合": "大きくぼかす (被写体強調)",
+                            "写真の質感": "現実に近いリアルさ",
+                            "光の当たり方": "明るくクリアに",
+                            "写真の色合い": "鮮やかな色",
+                            "使用カメラの雰囲気": "Canonのカメラ",
+                            "カメラ機種": "EOS R6 Mark II",
+                            "レンズの雰囲気/写る範囲": "人物を際立たせるレンズ (85mm)",
+                            "写真家/映像監督のスタイル": "指定なし",
+                            "アスペクト比": 9, // 9:16 (縦長)
+                            "被写体の見せ方/構図": ["全身を写す", "クローズアップで強調"], // グラビアなのでクローズアップも追加
+                            "撮影テクニック": ["固定撮影風"],
+                            "時間帯と光の状況": "昼間",
+                            "天気と環境": ["晴れ"],
+                            "解像度と品質": "超高画質",
+                            "特殊な視覚効果": []
+                        }
+                    }
+                },
+                "default": "ポートレート向け (人物強調)"
+            },
+            "写真の表現と視覚効果": {
+                "写真の目的/スタイル": {
+                    "type": "radio-with-hint",
+                    "options": {
+                        "Vogueファッション雑誌の表紙風": {
+                            "prompt": "cover photo for Vogue fashion magazine, fashion photoshoot",
+                            "description": "洗練されたハイファッションの雰囲気、大胆な構図と照明。雑誌の表紙に最適な写真。"
+                        },
+                        "GQ雑誌の表紙風": {
+                            "prompt": "cover photo for GQ magazine, fashion photoshoot",
+                            "description": "男性向けのスタイリッシュで力強いポートレート、モダンな雰囲気。雑誌の表紙に最適な写真。"
+                        },
+                        "National Geographicドキュメンタリー雑誌の表紙風": {
+                            "prompt": "cover photo for National Geographic documentary magazine, authentic, raw",
+                            "description": "自然でリアルな描写、壮大な風景や文化の記録。ドキュメンタリー雑誌の表紙に最適な写真。"
+                        },
+                        "Sports Illustratedスポーツ雑誌の表紙風": {
+                            "prompt": "cover photo for Sports Illustrated sports magazine, dynamic, action-packed",
+                            "description": "動きのある瞬間、アスリートの力強さを捉える。スポーツ雑誌の表紙に最適な写真。"
+                        },
+                        "映画のワンシーンのように": {
+                            "prompt": "cinematic, dramatic atmosphere",
+                            "description": "映画のようなドラマチックな光と影、物語性を感じる雰囲気。"
+                        },
+                        "ポップで鮮やか": {
+                            "prompt": "pop art, vibrant, colorful",
+                            "description": "明るくカラフルで、遊び心のあるポップな印象。"
+                        },
+                        "暗くミステリアス": {
+                            "prompt": "dark, moody, mysterious",
+                            "description": "影を強調し、重厚で神秘的な雰囲気。"
+                        },
+                        "明るく希望に満ちた": {
+                            "prompt": "bright, cheerful, optimistic",
+                            "description": "光を多く取り入れ、ポジティブで明るい印象。"
+                        },
+                        "SFコンセプトアート風": {
+                            "prompt": "sci-fi concept art",
+                            "description": "未来的な世界観や技術を描写するアートスタイル。"
+                        },
+                        "未来的なスタイル": {
+                            "prompt": "futuristic style",
+                            "description": "先進的でモダンなデザインや雰囲気を強調。"
+                        },
+                        "豪華で洗練された": {
+                            "prompt": "luxurious",
+                            "description": "高級感や優雅さを表現。"
+                        },
+                        "年間最優秀写真レベル": {
+                            "prompt": "photo of the year",
+                            "description": "技術的にも芸術的にも最高レベルの品質。"
+                        },
+                        "陰鬱な雰囲気": {
+                            "prompt": "gloomy atmosphere",
+                            "description": "憂鬱で物悲しい、暗い雰囲気。"
+                        },
+                        "女性アイドルの雑誌の表紙風": {
+                            "prompt": "cover photo for a female idol magazine, vibrant, dynamic, pop, bright lighting",
+                            "description": "女性アイドル雑誌の表紙のような、明るく華やかで躍動感のある写真。"
+                        },
+                        "週刊の漫画雑誌の表紙風": {
+                            "prompt": "photorealistic cover photo for a weekly manga magazine, featuring a beautiful model, vibrant, pop, bright lighting, dynamic pose, high resolution",
+                            "description": "週刊漫画雑誌の表紙のような、鮮やかで躍動感のある女性モデルの写真。グラビアアイドル風の表現。"
+                        }
+                    },
+                    "default": "Vogueファッション雑誌の表紙風"
+                },
+                "背景のぼかし具合": {
+                    "type": "radio-with-hint",
+                    "options": {
+                        "大きくぼかす (被写体強調)": {
+                            "prompt": "shallow depth of field, bokeh",
+                            "description": "人物や物を際立たせ、背景を美しくぼかします。"
+                        },
+                        "少しぼかす (映画的表現)": {
+                            "prompt": "cinematic depth of field",
+                            "description": "被写体を浮き立たせつつ、背景の状況も適度に残します。"
+                        },
+                        "全体をシャープに (風景・記録向け)": {
+                            "prompt": "deep depth of field, sharp focus on background",
+                            "description": "手前から奥まで全体にピントが合い、詳細を鮮明に写します。"
+                        }
+                    },
+                    "default": "大きくぼかす (被写体強調)"
+                },
+                "写真の質感": {
+                    "type": "radio-with-hint",
+                    "options": {
+                        "現実に近いリアルさ": {
+                            "prompt": "photorealistic, hyper-detailed, realistic rendering",
+                            "description": "まるで本物の写真のような、超高精細な描写。"
+                        },
+                        "アニメ風": {
+                            "prompt": "anime style, cel-shaded",
+                            "description": "日本のアニメのような、セル画調の表現。"
+                        },
+                        "イラスト風": {
+                            "prompt": "illustration style, hand-drawn",
+                            "description": "手描き感のある、絵画のような表現。"
+                        },
+                        "超高精細なディテール": {
+                            "prompt": "ultra-detailed",
+                            "description": "細部まで驚くほど鮮明に描写されます。"
+                        },
+                        "複雑な質感表現": {
+                            "prompt": "texture complexity",
+                            "description": "素材の表面の凹凸や質感をリアルに再現します。"
+                        }
+                    },
+                    "default": "現実に近いリアルさ"
+                },
+                "光の当たり方": {
+                    "type": "visual-button",
+                    "options": [
+                        { key: "室内の光", prompt: "indoor lighting", description: "部屋の中の光で、落ち着いた雰囲気を演出します。", visual: { backgroundColor: '#6b7280', boxShadow: 'inset 0 0 10px rgba(0,0,0,0.3)', text: '室内' } },
+                        { key: "自然光", prompt: "natural light", description: "太陽光や窓からの光など、自然な光で明るく。", visual: { backgroundImage: 'linear-gradient(to bottom right, #fcd34d, #f97316)', text: '自然光' } },
+                        { key: "ネオンライト", prompt: "neon lights, glowing light", description: "都市の夜景やサイバーパンクな雰囲気に。", visual: { backgroundColor: '#1f2937', boxShadow: '0 0 15px 5px #a855f7, inset 0 0 10px #a855f7', text: 'ネオン' } },
+                        { key: "スタジオ照明", prompt: "studio lighting", description: "プロの撮影スタジオのような均一でコントロールされた光。", visual: { backgroundImage: 'radial-gradient(circle at center, #ffffff 0%, #4a5568 70%)', color: '#1a202c', text: 'スタジオ' } },
+                        { key: "暗くドラマチックに", prompt: "dark lighting, low key", description: "影を強調し、重厚で神秘的な雰囲気を演出。", visual: { backgroundColor: '#000000', color: '#4a5568', text: '暗い' } },
+                        { key: "明るくクリアに", prompt: "bright lighting, high key", description: "全体的に明るく、清潔感のある印象に。", visual: { backgroundColor: '#ffffff', color: '#1a202c', text: '明るい' } },
+                        { key: "立体的な光", prompt: "volumetric lighting, ray tracing", description: "光が空気中の粒子に反射し、立体感のある光の筋を表現。", visual: { backgroundImage: 'linear-gradient(to top, rgba(0,0,0,0.8), rgba(255,255,255,0.2), rgba(0,0,0,0.8))', text: '立体' } },
+                        { key: "ドラマチックな光", prompt: "dramatic lighting", description: "強い明暗差で、感情的で印象的なシーンを演出。", visual: { backgroundImage: 'linear-gradient(to right, #000000 0%, #ffffff 50%, #000000 100%)', text: 'ドラマ' } },
+                        { key: "高コントラストな光", "prompt": "high contrast", description: "白と黒の差がはっきりとした、力強い印象。", visual: { backgroundImage: 'linear-gradient(to right, #000000 0%, #ffffff 50%, #000000 100%)', text: '高コントラスト' } },
+                        { key: "プロの照明", prompt: "professional lighting", description: "プロフェッショナルな撮影現場のような、計算された照明。", visual: { backgroundColor: '#4a5568', boxShadow: '0 0 10px rgba(255,255,255,0.5)', text: 'プロ' } }
+                    ],
+                    "default": "室内の光"
+                },
+                "写真の色合い": {
+                    "type": "radio-with-hint",
+                    "options": {
+                        "標準的な色": { "prompt": "standard color tone", "description": "自然でバランスの取れた色合い。" },
+                        "モノクロ": { "prompt": "monochrome, black and white", "description": "白黒写真のような、シンプルで力強い表現。" },
+                        "セピア調": { "prompt": "sepia tone", "description": "古写真のような、懐かしく温かい雰囲気。" },
+                        "鮮やかな色": { "prompt": "vivid colors", "description": "目を引く、はっきりとした色彩。" },
+                        "柔らかいパステル色": { "prompt": "pastel colors", "description": "淡く優しい、ふんわりとした色合い。" },
+                        "暖色系": { "prompt": "warm tones", "description": "赤やオレンジを基調とした、温かみのある色合い。" },
+                        "寒色系": { "prompt": "cool tones", "description": "青や緑を基調とした、涼しく落ち着いた色合い。" },
+                        "高コントラスト": { "prompt": "high contrast", "description": "明暗の差が大きく、力強い印象。" }
+                    },
+                    "default": "標準的な色"
+                },
+                "使用カメラの雰囲気": {
+                    "type": "nested-radio",
+                    "options": {
+                        "プロ仕様のカメラ": {
+                            "prompt": "professional camera",
+                            "models": {
+                                "任意の機種": {
+                                    "prompt": "professional camera",
+                                    "description": "特定の機種に依存せず、一般的な高品質なカメラの特性を表現します。"
+                                }
+                            }
+                        },
+                        "Canonのカメラ": {
+                            "prompt": "Canon camera",
+                            "models": {
+                                "EOS R5": { "prompt": "Canon EOS R5 camera", "description": "高解像度でシャープな描写、プロフェッショナルな静止画・動画撮影に最適。クリアで自然な色合い。" },
+                                "EOS R6 Mark II": { "prompt": "Canon EOS R6 Mark II camera", "description": "高速AFと高い連写性能で、動きの速い被写体も捉える。ポートレートやスポーツに。" },
+                                "EOS 5D Mark IV": { "prompt": "Canon EOS 5D Mark IV camera", "description": "フルフレームセンサーによる豊かな階調と美しいボケ味。ポートレートや風景に強み。" },
+                                "EOS Kiss X10": { "prompt": "Canon EOS Kiss X10 camera", "description": "軽量コンパクトで初心者にも扱いやすい。日常のスナップやVlog撮影に。" }
+                            }
+                        },
+                        "Sonyのカメラ": {
+                            "prompt": "Sony camera",
+                            "models": {
+                                "Alpha 7 III": { "prompt": "Sony Alpha 7 III camera", "description": "優れたオートフォーカスと低照度性能。汎用性が高く、幅広いシーンに対応。" },
+                                "Alpha 7 IV": { "prompt": "Sony Alpha 7 IV camera", "description": "高解像度と動画性能が向上。クリエイター向けのオールラウンドモデル。" },
+                                "Alpha 1": { "prompt": "Sony Alpha 1 camera", "description": "高速連写と高解像度を両立したフラッグシップモデル。スポーツや野生動物に最適。" },
+                                "ZV-E10": { "prompt": "Sony ZV-E10 camera", "description": "Vlog撮影に特化した設計。背景ぼかしや商品レビューモードで簡単プロ級動画。"
+                                }
+                            }
+                        },
+                        "Nikonのカメラ": {
+                            "prompt": "Nikon camera",
+                            "models": {
+                                "Z 9": { "prompt": "Nikon Z 9 camera", "description": "プロフェッショナル向けミラーレス。高速AFと堅牢なボディで、あらゆる撮影に対応。" },
+                                "Z 8": { "prompt": "Nikon Z 8 camera", "description": "Z 9の高性能をコンパクトなボディに凝縮。動画クリエイターやハイアマチュアに人気。" },
+                                "D850": { "prompt": "Nikon D850 camera", "description": "高解像度と高速性能を兼ね備えた一眼レフ。風景やポートレート、スタジオ撮影に。" },
+                                "D5600": { "prompt": "Nikon D5600 camera", "description": "初心者にも扱いやすいエントリーモデル。日常使いや旅行に最適。" }
+                            }
+                        },
+                        "Fujifilmのカメラ": {
+                            "prompt": "Fujifilm camera",
+                            "models": {
+                                "X-T4": { "prompt": "Fujifilm X-T4 camera", "description": "フィルムシミュレーションが特徴。美しい色再現で、ストリートやポートレートに人気。" },
+                                "X-H2S": { "prompt": "Fujifilm X-H2S camera", "description": "高速性能と動画機能が強化されたフラッグシップ。動きの速い被写体やプロ動画撮影に。" },
+                                "X-HF1": { "prompt": "Fujifilm X-HF1 camera", "description": "ハーフサイズカメラのような2in1機能搭載。レトロな雰囲気と組写真表現が特徴。日常スナップに。" },
+                                "GFX 100S": { "prompt": "Fujifilm GFX 100S camera", "description": "中判センサーによる圧倒的な解像度と階調。商業写真や風景写真に最適。" }
+                            }
+                        },
+                        "Leicaのカメラ": {
+                            "prompt": "Leica camera",
+                            "models": {
+                                "M11": { "prompt": "Leica M11 camera", "description": "レンジファインダーの伝統と最新技術の融合。独特の描写と操作感で、スナップやドキュメンタリーに。" },
+                                "Q2": { "prompt": "Leica Q2 camera", "description": "高性能な単焦点レンズ一体型。コンパクトながら高画質で、日常使いや旅行に。" },
+                                "SL2": { "prompt": "Leica SL2 camera", "description": "堅牢なボディと高解像度センサー。プロフェッショナルな静止画・動画撮影に対応。" }
+                            }
+                        }
+                    },
+                    "default": "プロ仕様のカメラ"
+                },
+                "レンズの雰囲気/写る範囲": {
+                    "type": "radio-with-hint",
+                    "options": {
+                        "広々とした風景を撮るレンズ": {
+                            "prompt": "wide-angle lens",
+                            "description": "広い範囲を写し込み、壮大な風景や空間を表現します。"
+                        },
+                        "自然な視点で撮るレンズ (35mm)": {
+                            "prompt": "35mm photography",
+                            "description": "人間の視野に近い自然な画角で、ドキュメンタリーやスナップに最適です。"
+                        },
+                        "人間の視点に近いレンズ (50mm)": {
+                            "prompt": "50mm photography",
+                            "description": "最も標準的なレンズで、ポートレートや日常のスナップに自然な遠近感を与えます。"
+                        },
+                        "人物を際立たせるレンズ (85mm)": {
+                            "prompt": "85mm lens photography",
+                            "description": "背景を大きくぼかし、人物を美しく引き立てるポートレートに最適なレンズです。"
+                        },
+                        "遠くのものを引き寄せるレンズ": {
+                            "prompt": "telephoto lens",
+                            "description": "遠くの被写体を大きく写し、背景を圧縮する効果があります。"
+                        }
+                    },
+                    "default": "人間の視点に近いレンズ (50mm)"
+                },
+                "写真家/映像監督のスタイル": {
+                    "type": "radio-with-hint",
+                    "options": {
+                        "ロジャー・ディーキンス風": {
+                            "prompt": "cinematography by Roger Deakins",
+                            "description": "自然でドラマチックな光、深みのある影、緻密な構図が特徴。重厚で芸術的な雰囲気に。"
+                        },
+                        "エマニュエル・ルベツキ風": {
+                            "prompt": "cinematography by Emmanuel Lubezki",
+                            "description": "長回し、自然光の活用、流れるようなカメラワークが特徴。没入感のある映像に。"
+                        },
+                        "ロジャー・プラット風 (ブラジル映画スタイル)": {
+                            "prompt": "cinematography by Roger Pratt, Brazil feature film cinematography look",
+                            "description": "シュールでディストピア的な世界観、独特の視覚効果が特徴。幻想的で不穏な雰囲気に。"
+                        },
+                        "ゴードン・ウィリス風": {
+                            "prompt": "cinematography by Gordon Willis",
+                            "description": "「闇の王子」と呼ばれるほど暗く、アンダー露出で高コントラストな映像が特徴。重厚でミステリアスな雰囲気に。"
+                        },
+                        "ヴィットリオ・ストラーロ風": {
+                            "prompt": "cinematography by Vittorio Storaro",
+                            "description": "色彩の魔術師。色を象徴的に用い、感情やテーマを表現する。鮮やかで芸術的な色使いに。"
+                        },
+                        "アニー・リーボヴィッツ風": {
+                            "prompt": "photography by Annie Leibovitz",
+                            "description": "著名人のポートレートで有名。ドラマチックで演劇的な演出、被写体の個性を引き出す。力強く印象的なポートレートに。"
+                        },
+                        "指定なし": {
+                            "prompt": "",
+                            "description": "特定の撮影スタイルを指定しません。"
+                        }
+                    },
+                    "default": "指定なし"
+                },
+                "アスペクト比": {
+                    "type": "slider",
+                    "options": [
+                        { label: "2:1", prompt: "--ar 2:1", ratio: {width: 2, height: 1} },
+                        { label: "16:9", prompt: "--ar 16:9", ratio: {width: 16, height: 9} },
+                        { label: "3:2", prompt: "--ar 3:2", ratio: {width: 3, height: 2} },
+                        { label: "4:3", prompt: "--ar 4:3", ratio: {width: 4, height: 3} },
+                        { label: "6:5", prompt: "--ar 6:5", ratio: {width: 6, height: 5} },
+                        { label: "1:1", prompt: "--ar 1:1", ratio: {width: 1, height: 1} },
+                        { label: "5:6", prompt: "--ar 5:6", ratio: {width: 5, height: 6} },
+                        { label: "3:4", prompt: "--ar 3:4", ratio: {width: 3, height: 4} },
+                        { label: "2:3", prompt: "--ar 2:3", ratio: {width: 2, height: 3} },
+                        { label: "9:16", prompt: "--ar 9:16", ratio: {width: 9, height: 16} },
+                        { label: "1:2", prompt: "--ar 1:2", ratio: {width: 1, height: 2} }
+                    ],
+                    "defaultIndex": 5
+                }
+            },
+            "撮影テクニックと環境設定": {
+                "被写体の見せ方/構図": {
+                    "type": "checkbox-with-hint",
+                    "options": {
+                        "正面から": { "prompt": "from front", "description": "被写体を正面から捉え、直接的な印象を与えます。" },
+                        "側面から": { "prompt": "from side", "description": "被写体の横顔や側面からの動きを表現します。" },
+                        "背面から": { "prompt": "from back", "description": "被写体の後ろ姿で、物語性や奥行きを演出します。" },
+                        "上から見下ろす": { "prompt": "from above", "description": "俯瞰的な視点で、全体像や広がりを表現します。" },
+                        "下から見上げる": { "prompt": "from below", "description": "被写体を大きく見せ、力強さや威厳を強調します。" },
+                        "クローズアップで強調": { "prompt": "close-up shot", "description": "被写体の細部や表情に焦点を当て、強い印象を与えます。" },
+                        "全身を写す": { "prompt": "full body shot", "description": "被写体の全体像と、その場の雰囲気をバランス良く捉えます。" },
+                        "魚眼レンズのような効果": { "prompt": "fisheye lens", "description": "広範囲を歪ませて写し、ユニークで遊び心のある印象に。" },
+                        "複数のアングルで構成": { "prompt": "multiple angles", "description": "同じ被写体を複数の視点から撮影し、多角的な表現をします。" },
+                        "スリーパネルグリッドで構成": { "prompt": "three panel grid", "description": "3つの画像を並べて、連続性や比較を表現します。" },
+                        "広大な景色と共に": { "prompt": "vast landscape", "description": "被写体を広大な自然や空間の中に配置します。" },
+                        "密集した都市の背景": { "prompt": "dense city", "description": "都会の喧騒や建物の密集感を背景に。" },
+                        "対称的な構図": { "prompt": "symmetrical composition", "description": "左右対称で安定感のある、整った構図。" },
+                        "非対称な構図": { "prompt": "asymmetrical composition", "description": "あえてバランスを崩し、動きや面白さを表現。" },
+                        "中央に配置": { "prompt": "centered composition", "description": "被写体を画面の中心に置き、安定感と強調を。" },
+                        "スタジオ背景": { "prompt": "studio background", "description": "シンプルな背景で被写体を際立たせる。" }
+                    },
+                    "default": ["全身を写す"]
+                },
+                "撮影テクニック": {
+                    "type": "checkbox-with-hint",
+                    "options": {
+                        "手持ち撮影風": { "prompt": "handheld shot", "description": "手持ちカメラのような、動きのある自然な揺れ。" },
+                        "固定撮影風": { "prompt": "fixed shot", "description": "三脚を使ったような、安定したブレのない映像。" },
+                        "ドローン撮影風": { "prompt": "drone shot", "description": "空からの視点で、広大な景色や俯瞰的な構図を。" },
+                        "スローモーション": { "prompt": "slow motion", "description": "動きをゆっくりと見せ、ドラマチックな瞬間を演出。" },
+                        "タイムラプス": { "prompt": "time-lapse", "description": "時間の流れを圧縮し、変化をダイナミックに表現。" },
+                        "マクロ撮影": { "prompt": "macro shot", "description": "被写体の超接写で、肉眼では見えない細部を表現。" },
+                        "パン (横移動)": { "prompt": "pan shot", "description": "カメラを左右に動かし、景色や被写体を追う。" },
+                        "ティルト (縦移動)": { "prompt": "tilt shot", "description": "カメラを上下に動かし、高さや奥行きを表現。" },
+                        "ズームイン/アウト": { "prompt": "zoom in, zoom out", "description": "被写体に寄ったり引いたりして、注目度や情報量を調整。" },
+                        "ドリー (前後移動)": { "prompt": "dolly shot", "description": "カメラを前後に移動させ、空間の奥行きや没入感を表現。" },
+                        "トラッキング (追従移動)": { "prompt": "tracking shot", "description": "被写体に合わせてカメラが移動し、動きを強調。" },
+                        "クレーン (上下移動)": { "prompt": "crane shot", "description": "クレーンを使ったような、ダイナミックな高低差の移動。" },
+                        "スタビライザー使用": { "prompt": "stabilized shot", "description": "ブレを抑え、滑らかで安定した映像。" }
+                    },
+                    "default": ["固定撮影風"]
+                },
+                "時間帯と光の状況": {
+                    "type": "radio-with-hint",
+                    "options": {
+                        "昼間": { "prompt": "daylight", "description": "明るく自然な日中の光。" },
+                        "夜間": { "prompt": "nighttime", "description": "暗く、人工的な光が際立つ夜の雰囲気。" },
+                        "夕暮れ時": { "prompt": "dusk, twilight", "description": "日が沈む頃の、幻想的で柔らかな光。" },
+                        "夜明け": { "prompt": "dawn, sunrise", "description": "日が昇る頃の、清々しく希望に満ちた光。" },
+                        "暖かい夕日": { "prompt": "warm golden evening sunlight", "description": "夕日の温かい金色が全体を包む。" },
+                        "柔らかな光": { "prompt": "soft sunlight", "description": "影が薄く、全体的に優しい雰囲気の光。" },
+                        "窓からの光の屈折": { "prompt": "sunlight refracts on the window frame", "description": "窓枠で光が屈折し、独特の模様や雰囲気を生み出す。" }
+                    },
+                    "default": "昼間"
+                },
+                "天気と環境": {
+                    "type": "checkbox-with-hint",
+                    "options": {
+                        "晴れ": { "prompt": "clear sky", "description": "青空が広がる、明るく開放的な天気。" },
+                        "曇り": { "prompt": "overcast", "description": "雲が空を覆い、柔らかく均一な光。" },
+                        "霧": { "prompt": "fog, misty", "description": "霧がかかり、幻想的で神秘的な雰囲気。" },
+                        "嵐": { "prompt": "stormy", "description": "荒々しい嵐の天気、劇的な印象。" },
+                        "風が強い": { "prompt": "windy, banners blowing in the wind", "description": "風が吹き荒れ、動きやダイナミズムを表現。" },
+                        "砂嵐": { "prompt": "sandstorm", "description": "砂嵐が舞い、荒涼とした雰囲気。" }
+                    },
+                    "default": []
+                },
+                "解像度と品質": {
+                    "type": "radio-with-hint",
+                    "options": {
+                        "標準的な品質": { "prompt": "standard resolution", "description": "一般的な画質で、バランスの取れた表現。" },
+                        "高画質": { "prompt": "high resolution", "description": "より鮮明で詳細な描写。" },
+                        "超高画質": { "prompt": "ultra high resolution", "description": "非常に細部までクリアに表現された画質。" },
+                        "4K品質": { "prompt": "4K resolution", "description": "超高精細な4K映像のような品質。" },
+                        "8K品質": { "prompt": "8K resolution", "description": "究極のリアリティを追求する8K映像のような品質。" }
+                    },
+                    "default": "標準的な品質"
+                },
+                "特殊な視覚効果": {
+                    "type": "checkbox-with-hint",
+                    "options": {
+                        "グリッチエフェクト": { "prompt": "glitch effect", "description": "デジタルノイズや乱れのような、意図的な視覚効果。" },
+                        "モザイクエフェクト": { "prompt": "mosaic effect", "description": "画像を粗いピクセルで表現し、抽象的な印象に。" },
+                        "ぼかし効果": { "prompt": "blur effect", "description": "全体的または部分的にぼかしを加え、夢のような、あるいは動きのある表現。" },
+                        "レンズフレア": { "prompt": "lens flare", "description": "強い光源がレンズに反射してできる光の輪や線。" },
+                        "粒子表現": { "prompt": "particles", "description": "空気中の塵や光の粒子を表現し、幻想的な雰囲気に。" },
+                        "スモーク/煙": { "prompt": "smoke", "description": "煙や霧を演出し、神秘的または不穏な雰囲気に。" },
+                        "雨の表現": { "prompt": "rain effect", "description": "雨が降っている様子を表現し、情感やドラマを演出。" },
+                        "雪の表現": { "prompt": "snow effect", "description": "雪が降っている様子を表現し、静寂や美しさを演出。" },
+                        "ちらつく光": { "prompt": "flickering lights", "description": "光が不規則に点滅し、不安定さやサスペンスを演出。" }
+                    },
+                    "default": []
+                }
+            }
+        };
+
+        const currentSelections = {};
+        const controlsContainer = document.getElementById('controls-container');
+        const promptOutput = document.getElementById('prompt-output');
+        const copyButton = document.getElementById('copy-button');
+        const messageBox = document.getElementById('message-box');
+        const basePromptInput = document.getElementById('base-prompt-input'); // Base prompt input
+        // basePromptText は直接更新せず、textarea の値から取得するように変更
+        // let basePromptText = ""; // State for base prompt text
+
+        let aspectRatioBox = null;
+        let aspectRatioLabel = null;
+
+        // Global variables to hold references to dynamic elements for camera models
+        let cameraModelSelectionDiv = null;
+        let cameraModelHintDiv = null;
+
+        function showMessage(message, isError = false) {
+            messageBox.textContent = message;
+            messageBox.className = 'message-box show ' + (isError ? 'bg-red-500' : 'bg-green-500');
+            setTimeout(() => {
+                messageBox.className = 'message-box';
+            }, 3000);
+        }
+
+        // 各項目のヒントパネルを更新する関数
+        function updateIndividualHint(controlKey, selectedValue) {
+            const hintPanel = document.getElementById(`${controlKey}-hint`);
+            if (!hintPanel) return;
+
+            let controlData = null;
+            for (const sectionKey in styleConfig) {
+                if (styleConfig[sectionKey][controlKey]) {
+                    controlData = styleConfig[sectionKey][controlKey];
+                    break;
+                }
+            }
+
+            if (!controlData || !controlData.options) {
+                hintPanel.innerHTML = '';
+                hintPanel.classList.add('hidden');
+                return;
+            }
+
+            let optionInfo = null;
+            if (controlData.type === 'visual-button') {
+                optionInfo = controlData.options.find(opt => opt.key === selectedValue);
+            } else {
+                optionInfo = controlData.options[selectedValue];
+            }
+
+            if (optionInfo && (optionInfo.description || optionInfo.prompt)) {
+                hintPanel.innerHTML = `
+                    <p class="individual-hint-description">${optionInfo.description || ''}</p>
+                    <p class="individual-hint-prompt">${optionInfo.prompt || ''}</p>
+                `;
+                hintPanel.classList.remove('hidden');
+            } else {
+                hintPanel.innerHTML = '';
+                hintPanel.classList.add('hidden');
+            }
+        }
+
+        function renderControls() {
+            // Render Presets Section first
+            const presetsSectionDiv = document.createElement('div');
+            presetsSectionDiv.className = 'mb-6';
+            presetsSectionDiv.innerHTML = `<h2 class="text-xl font-semibold section-title mb-4">プリセット</h2>`;
+
+            const presetRadioGroupDiv = document.createElement('div');
+            presetRadioGroupDiv.className = 'flex flex-wrap gap-2 radio-group';
+
+            const presetControlData = styleConfig["プリセット"];
+            for (const presetKey in presetControlData.options) {
+                const presetInfo = presetControlData.options[presetKey];
+                const inputId = `preset-${presetKey}`;
+                const input = document.createElement('input');
+                input.type = 'radio';
+                input.name = 'preset-selection';
+                input.id = inputId;
+                input.value = presetKey;
+                if (presetControlData.default === presetKey) {
+                    input.checked = true;
+                }
+                input.addEventListener('change', (event) => {
+                    applyPreset(event.target.value);
+                });
+
+                const label = document.createElement('label');
+                label.htmlFor = inputId;
+                label.textContent = presetKey;
+
+                presetRadioGroupDiv.appendChild(input);
+                presetRadioGroupDiv.appendChild(label);
+            }
+            presetsSectionDiv.appendChild(presetRadioGroupDiv);
+            controlsContainer.appendChild(presetsSectionDiv); // Add to the very top
+
+            // Render other sections
+            for (const sectionKey in styleConfig) {
+                if (sectionKey === "プリセット") continue; // Skip preset section as it's already rendered
+
+                const sectionData = styleConfig[sectionKey];
+                const sectionDiv = document.createElement('div');
+                sectionDiv.className = 'mb-6';
+                sectionDiv.innerHTML = `<h2 class="text-xl font-semibold section-title mb-4">${sectionKey}</h2>`;
+
+                for (const controlKey in sectionData) {
+                    const controlData = sectionData[controlKey];
+                    const controlDiv = document.createElement('div');
+                    controlDiv.className = 'mb-4';
+                    controlDiv.innerHTML = `<h3 class="text-lg font-medium mb-2 text-gray-300">${controlKey}</h3>`;
+
+                    if (controlKey === "アスペクト比") {
+                        const previewContainer = document.createElement('div');
+                        previewContainer.className = 'aspect-ratio-preview-container';
+                        aspectRatioBox = document.createElement('div');
+                        aspectRatioBox.className = 'aspect-ratio-box';
+                        previewContainer.appendChild(aspectRatioBox);
+                        controlDiv.appendChild(previewContainer);
+
+                        const sliderWrapper = document.createElement('div');
+                        sliderWrapper.className = 'slider-wrapper';
+
+                        const relativeContainer = document.createElement('div');
+                        relativeContainer.className = 'relative w-full h-8';
+
+                        const slider = document.createElement('input');
+                        slider.type = 'range';
+                        slider.name = controlKey;
+                        slider.min = 0;
+                        slider.max = controlData.options.length - 1;
+                        slider.value = controlData.defaultIndex;
+                        slider.className = 'absolute inset-0 w-full h-full z-10';
+                        slider.addEventListener('input', updatePrompt);
+
+                        const ticksContainer = document.createElement('div');
+                        ticksContainer.className = 'slider-ticks absolute inset-0 pointer-events-none z-0';
+
+                        controlData.options.forEach((option, index) => {
+                            const tickMark = document.createElement('div');
+                            tickMark.className = 'tick-mark';
+                            tickMark.style.left = `${(index / (controlData.options.length - 1)) * 100}%`;
+                            ticksContainer.appendChild(tickMark);
+                        });
+
+                        aspectRatioLabel = document.createElement('span');
+                        aspectRatioLabel.className = 'slider-label block text-center mt-2';
+
+                        relativeContainer.appendChild(slider);
+                        relativeContainer.appendChild(ticksContainer);
+                        sliderWrapper.appendChild(relativeContainer);
+                        sliderWrapper.appendChild(aspectRatioLabel);
+
+                        controlDiv.appendChild(sliderWrapper);
+                        currentSelections[controlKey] = controlData.defaultIndex;
+                    } else if (controlKey === "使用カメラの雰囲気") {
+                        const brandRadioGroupDiv = document.createElement('div');
+                        brandRadioGroupDiv.className = 'flex flex-wrap gap-2 radio-group';
+
+                        currentSelections[controlKey] = controlData.default;
+                        const defaultBrandData = controlData.options[controlData.default];
+                        const defaultModelKey = Object.keys(defaultBrandData.models)[0];
+                        currentSelections["カメラ機種"] = defaultModelKey;
+
+                        for (const brandOptionKey in controlData.options) {
+                            const inputId = `${controlKey}-${brandOptionKey}`;
+                            const input = document.createElement('input');
+                            input.type = 'radio';
+                            input.name = controlKey;
+                            input.id = inputId;
+                            input.value = brandOptionKey;
+                            if (controlData.default === brandOptionKey) {
+                                input.checked = true;
+                            }
+                            input.addEventListener('change', (event) => {
+                                currentSelections[controlKey] = event.target.value;
+                                const selectedBrandData = controlData.options[event.target.value];
+                                const newDefaultModelKey = Object.keys(selectedBrandData.models)[0];
+                                currentSelections["カメラ機種"] = newDefaultModelKey;
+                                renderCameraModels(event.target.value);
+                                generatePrompt();
+                            });
+
+                            const label = document.createElement('label');
+                            label.htmlFor = inputId;
+                            label.textContent = brandOptionKey;
+
+                            brandRadioGroupDiv.appendChild(input);
+                            brandRadioGroupDiv.appendChild(label);
+                        }
+                        controlDiv.appendChild(brandRadioGroupDiv);
+
+                        cameraModelSelectionDiv = document.createElement('div');
+                        cameraModelSelectionDiv.id = 'camera-model-selection';
+                        cameraModelSelectionDiv.className = 'mt-4';
+                        controlDiv.appendChild(cameraModelSelectionDiv);
+
+                        cameraModelHintDiv = document.createElement('div');
+                        cameraModelHintDiv.id = 'camera-model-hint';
+                        cameraModelHintDiv.className = 'mt-2 p-3 rounded-md bg-gray-700 text-gray-300 hidden';
+                        controlDiv.appendChild(cameraModelHintDiv);
+
+                        renderCameraModels(controlData.default);
+                    } else if (controlData.type === 'visual-button') {
+                        const visualButtonGroupDiv = document.createElement('div');
+                        visualButtonGroupDiv.className = 'flex flex-wrap gap-2 lighting-visual-button-group';
+
+                        currentSelections[controlKey] = controlData.default;
+
+                        controlData.options.forEach(option => {
+                            const visualButton = document.createElement('div');
+                            visualButton.className = 'visual-button';
+                            visualButton.dataset.key = option.key;
+
+                            for (const styleProp in option.visual) {
+                                if (styleProp === 'text') {
+                                    visualButton.textContent = option.visual[styleProp];
+                                } else {
+                                    visualButton.style[styleProp] = option.visual[styleProp];
+                                }
+                            }
+
+                            visualButton.addEventListener('click', () => {
+                                visualButtonGroupDiv.querySelectorAll('.visual-button').forEach(btn => {
+                                    btn.classList.remove('selected');
+                                });
+                                visualButton.classList.add('selected');
+
+                                currentSelections[controlKey] = option.key;
+                                updateIndividualHint(controlKey, option.key); // 個別ヒントパネルを更新
+                                generatePrompt();
+                            });
+
+                            visualButtonGroupDiv.appendChild(visualButton);
+                        });
+                        controlDiv.appendChild(visualButtonGroupDiv);
+
+                        // 個別ヒントパネルを追加
+                        const hintPanel = document.createElement('div');
+                        hintPanel.id = `${controlKey}-hint`;
+                        hintPanel.className = 'individual-hint-panel hidden';
+                        controlDiv.appendChild(hintPanel);
+                        // 初期選択のヒントを表示
+                        const defaultOption = controlData.options.find(opt => opt.key === controlData.default);
+                        if (defaultOption) {
+                            updateIndividualHint(controlKey, defaultOption.key);
+                        }
+
+                    } else if (controlData.type === 'radio-with-hint') {
+                        const radioGroupDiv = document.createElement('div');
+                        radioGroupDiv.className = 'flex flex-wrap gap-2 radio-group';
+
+                        currentSelections[controlKey] = controlData.default;
+
+                        for (const optionKey in controlData.options) {
+                            const optionInfo = controlData.options[optionKey];
+                            const inputId = `${controlKey}-${optionKey}`;
+                            const input = document.createElement('input');
+                            input.type = 'radio';
+                            input.name = controlKey;
+                            input.id = inputId;
+                            input.value = optionKey;
+                            if (controlData.default === optionKey) {
+                                input.checked = true;
+                            }
+                            input.addEventListener('change', (event) => {
+                                currentSelections[controlKey] = event.target.value;
+                                updateIndividualHint(controlKey, event.target.value); // 個別ヒントパネルを更新
+                                generatePrompt();
+                            });
+
+                            const label = document.createElement('label');
+                            label.htmlFor = inputId;
+                            label.className = 'option-label-container';
+                            label.innerHTML = `<span class="option-label-text">${optionKey}</span>`;
+
+                            radioGroupDiv.appendChild(input);
+                            radioGroupDiv.appendChild(label);
+                        }
+                        controlDiv.appendChild(radioGroupDiv);
+
+                        // 個別ヒントパネルを追加
+                        const hintPanel = document.createElement('div');
+                        hintPanel.id = `${controlKey}-hint`;
+                        hintPanel.className = 'individual-hint-panel hidden';
+                        controlDiv.appendChild(hintPanel);
+                        // 初期選択のヒントを表示
+                        updateIndividualHint(controlKey, controlData.default);
+
+                    } else if (controlData.type === 'checkbox-with-hint') {
+                        const checkboxGroupDiv = document.createElement('div');
+                        checkboxGroupDiv.className = 'flex flex-wrap gap-2 checkbox-group';
+                        currentSelections[controlKey] = Array.isArray(controlData.default) ? [...controlData.default] : [];
+
+                        for (const optionKey in controlData.options) {
+                            const optionInfo = controlData.options[optionKey];
+                            const inputId = `${controlKey}-${optionKey}`;
+                            const input = document.createElement('input');
+                            input.type = 'checkbox';
+                            input.name = controlKey;
+                            input.id = inputId;
+                            input.value = optionKey;
+                            if (currentSelections[controlKey].includes(optionKey)) {
+                                input.checked = true;
+                            }
+                            input.addEventListener('change', (event) => {
+                                if (event.target.checked) {
+                                    currentSelections[controlKey].push(event.target.value);
+                                    updateIndividualHint(controlKey, event.target.value); // 個別ヒントパネルを更新
+                                } else {
+                                    currentSelections[controlKey] = currentSelections[controlKey].filter(item => item !== event.target.value);
+                                    // チェックボックスの選択が全て解除されたらヒントをクリア
+                                    if (currentSelections[controlKey].length === 0) {
+                                        const hintPanel = document.getElementById(`${controlKey}-hint`);
+                                        if (hintPanel) {
+                                            hintPanel.innerHTML = '';
+                                            hintPanel.classList.add('hidden');
+                                        }
+                                    } else {
+                                        // 複数選択されている場合は、最後に選択されたもののヒントを表示し続ける
+                                        // または、選択されているもの全てのヒントを結合して表示するなど、複雑なロジックが必要
+                                        // ここでは、一旦クリアして、再度選択されたら表示するシンプルな挙動にする
+                                        const hintPanel = document.getElementById(`${controlKey}-hint`);
+                                        if (hintPanel) {
+                                            hintPanel.innerHTML = '';
+                                            hintPanel.classList.add('hidden');
+                                        }
+                                    }
+                                }
+                                generatePrompt();
+                            });
+
+                            const label = document.createElement('label');
+                            label.htmlFor = inputId;
+                            label.className = 'option-label-container';
+                            label.innerHTML = `<span class="option-label-text">${optionKey}</span>`;
+
+                            checkboxGroupDiv.appendChild(input);
+                            checkboxGroupDiv.appendChild(label);
+                        }
+                        controlDiv.appendChild(checkboxGroupDiv);
+
+                        // 個別ヒントパネルを追加
+                        const hintPanel = document.createElement('div');
+                        hintPanel.id = `${controlKey}-hint`;
+                        hintPanel.className = 'individual-hint-panel hidden';
+                        controlDiv.appendChild(hintPanel);
+                        // 初期選択のヒントを表示 (複数選択の場合は最初のもの)
+                        if (currentSelections[controlKey].length > 0) {
+                            updateIndividualHint(controlKey, currentSelections[controlKey][0]);
+                        }
+
+                    }
+                    else if (controlData.type === 'radio') {
+                        const radioGroupDiv = document.createElement('div');
+                        radioGroupDiv.className = 'flex flex-wrap gap-2 radio-group';
+                        for (const optionKey in controlData.options) {
+                            const inputId = `${controlKey}-${optionKey}`;
+                            const input = document.createElement('input');
+                            input.type = 'radio';
+                            input.name = controlKey;
+                            input.id = inputId;
+                            input.value = optionKey;
+                            if (controlData.default === optionKey) {
+                                input.checked = true;
+                                currentSelections[controlKey] = optionKey;
+                            }
+                            input.addEventListener('change', updatePrompt);
+
+                            const label = document.createElement('label');
+                            label.htmlFor = inputId;
+                            label.textContent = optionKey;
+
+                            radioGroupDiv.appendChild(input);
+                            radioGroupDiv.appendChild(label);
+                        }
+                        controlDiv.appendChild(radioGroupDiv);
+                    } else if (controlData.type === 'checkbox') {
+                        const checkboxGroupDiv = document.createElement('div');
+                        checkboxGroupDiv.className = 'flex flex-wrap gap-2 checkbox-group';
+                        currentSelections[controlKey] = [];
+                        for (const optionKey in controlData.options) {
+                            const inputId = `${controlKey}-${optionKey}`;
+                            const input = document.createElement('input');
+                            input.type = 'checkbox';
+                            input.name = controlKey;
+                            input.id = inputId;
+                            input.value = optionKey;
+                            if (Array.isArray(controlData.default) && controlData.default.includes(optionKey)) {
+                                input.checked = true;
+                                currentSelections[controlKey].push(optionKey);
+                            }
+                            input.addEventListener('change', updatePrompt);
+
+                            const label = document.createElement('label');
+                            label.htmlFor = inputId;
+                            label.textContent = optionKey;
+
+                            checkboxGroupDiv.appendChild(input);
+                            checkboxGroupDiv.appendChild(label);
+                        }
+                        controlDiv.appendChild(checkboxGroupDiv);
+                    } else if (controlData.type === 'select') {
+                        const selectElement = document.createElement('select');
+                        selectElement.className = 'w-full p-2 rounded-md bg-gray-700 border border-gray-600 text-white';
+                        selectElement.name = controlKey;
+                        selectElement.addEventListener('change', updatePrompt);
+
+                        for (const optionKey in controlData.options) {
+                            const option = document.createElement('option');
+                            option.value = optionKey;
+                            option.textContent = optionKey;
+                            if (controlData.default === optionKey) {
+                                option.selected = true;
+                                currentSelections[controlKey] = optionKey;
+                            }
+                            selectElement.appendChild(option);
+                        }
+                        controlDiv.appendChild(selectElement);
+                    }
+                    sectionDiv.appendChild(controlDiv);
+                }
+                controlsContainer.appendChild(sectionDiv);
+            }
+        }
+
+        // カメラ機種のラジオボタンとヒントをレンダリングする関数
+        function renderCameraModels(brandKey) {
+            if (!cameraModelSelectionDiv) return;
+
+            cameraModelSelectionDiv.innerHTML = '';
+            cameraModelHintDiv.textContent = '';
+            cameraModelHintDiv.classList.add('hidden');
+
+            const brandData = styleConfig["写真の表現と視覚効果"]["使用カメラの雰囲気"].options[brandKey];
+            if (!brandData || !brandData.models) return;
+
+            const modelH3 = document.createElement('h3');
+            modelH3.className = 'text-lg font-medium mb-2 text-gray-300';
+            modelH3.textContent = 'カメラ機種';
+            cameraModelSelectionDiv.appendChild(modelH3);
+
+            const modelRadioGroupDiv = document.createElement('div');
+            modelRadioGroupDiv.className = 'flex flex-wrap gap-2 radio-group';
+
+            const defaultModelKey = Object.keys(brandData.models)[0];
+
+            for (const modelKey in brandData.models) {
+                const modelInfo = brandData.models[modelKey];
+                const inputId = `カメラ機種-${modelKey}`;
+                const input = document.createElement('input');
+                input.type = 'radio';
+                input.name = 'カメラ機種';
+                input.id = inputId;
+                input.value = modelKey;
+
+                if (modelKey === currentSelections["カメラ機種"]) {
+                    input.checked = true;
+                } else if (modelKey === defaultModelKey && !currentSelections["カメラ機種"]) {
+                    input.checked = true;
+                    currentSelections["カメラ機種"] = defaultModelKey;
+                }
+
+                input.addEventListener('change', (event) => {
+                    currentSelections["カメラ機種"] = event.target.value;
+                    updateCameraModelHint(event.target.value, brandKey);
+                    generatePrompt();
+                });
+
+                const label = document.createElement('label');
+                label.htmlFor = inputId;
+                label.className = 'option-label-container';
+                label.innerHTML = `
+                    <span class="option-label-text">${modelKey}</span>
+                    <span class="individual-hint-prompt">${modelInfo.prompt}</span>
+                `;
+
+                modelRadioGroupDiv.appendChild(input);
+                modelRadioGroupDiv.appendChild(label);
+            }
+            cameraModelSelectionDiv.appendChild(modelRadioGroupDiv);
+
+            updateCameraModelHint(currentSelections["カメラ機種"], brandKey);
+        }
+
+        // カメラ機種のヒントを更新する関数 (これは共通パネルとは別に、機種選択の下に表示される)
+        function updateCameraModelHint(modelKey, brandKey) {
+            if (!cameraModelHintDiv) return;
+
+            const brandData = styleConfig["写真の表現と視覚効果"]["使用カメラの雰囲気"].options[brandKey];
+            if (!brandData || !brandData.models || !brandData.models[modelKey]) {
+                cameraModelHintDiv.classList.add('hidden');
+                cameraModelHintDiv.textContent = '';
+                return;
+            }
+
+            const modelInfo = brandData.models[modelKey];
+            cameraModelHintDiv.textContent = modelInfo.description;
+            cameraModelHintDiv.classList.remove('hidden');
+        }
+
+        // プリセットを適用する関数
+        function applyPreset(presetKey) {
+            const presetData = styleConfig["プリセット"].options[presetKey];
+            if (!presetData) return;
+
+            // すべての現在の選択とヒントをクリア
+            for (const sectionKey in styleConfig) {
+                const sectionData = styleConfig[sectionKey];
+                // プリセットセクション自体はスキップ
+                if (sectionKey === "プリセット") continue;
+
+                for (const controlKey in sectionData) {
+                    const controlType = sectionData[controlKey].type;
+
+                    // ラジオボタンとチェックボックスの選択を解除
+                    const elements = document.querySelectorAll(`input[name="${controlKey}"]`);
+                    elements.forEach(el => {
+                        if (el.type === 'radio' || el.type === 'checkbox') {
+                            el.checked = false;
+                        }
+                    });
+
+                    // ビジュアルボタンの選択を解除
+                    if (controlType === 'visual-button') {
+                        const visualButtons = document.querySelectorAll(`.lighting-visual-button-group .visual-button`);
+                        visualButtons.forEach(btn => btn.classList.remove('selected'));
+                    }
+
+                    // 個別ヒントパネルをクリアして非表示
+                    const hintPanel = document.getElementById(`${controlKey}-hint`);
+                    if (hintPanel) {
+                        hintPanel.innerHTML = '';
+                        hintPanel.classList.add('hidden');
+                    }
+                    // カメラ機種のヒントもクリア
+                    if (controlKey === "使用カメラの雰囲気" && cameraModelHintDiv) {
+                        cameraModelHintDiv.innerHTML = '';
+                        cameraModelHintDiv.classList.add('hidden');
+                    }
+                }
+            }
+
+            // プリセットの選択を適用
+            for (const controlKey in presetData.selections) {
+                let presetValue = presetData.selections[controlKey];
+                let controlData = null;
+                for (const sectionKey in styleConfig) {
+                    if (styleConfig[sectionKey][controlKey]) {
+                        controlData = styleConfig[sectionKey][controlKey];
+                        break;
+                    }
+                }
+
+                if (!controlData) continue;
+
+                currentSelections[controlKey] = presetValue;
+
+                if (controlData.type === 'radio-with-hint' || controlData.type === 'radio') {
+                    const radioInput = document.getElementById(`${controlKey}-${presetValue}`);
+                    if (radioInput) {
+                        radioInput.checked = true;
+                        updateIndividualHint(controlKey, presetValue);
+                    }
+                } else if (controlData.type === 'checkbox-with-hint' || controlData.type === 'checkbox') {
+                    currentSelections[controlKey] = []; // Clear current before adding new
+                    presetValue.forEach(val => {
+                        const checkboxInput = document.getElementById(`${controlKey}-${val}`);
+                        if (checkboxInput) {
+                            checkboxInput.checked = true;
+                            currentSelections[controlKey].push(val);
+                            updateIndividualHint(controlKey, val);
+                        }
+                    });
+                } else if (controlData.type === 'visual-button') {
+                    const visualButton = document.querySelector(`.lighting-visual-button-group .visual-button[data-key="${presetValue}"]`);
+                    if (visualButton) {
+                        visualButton.classList.add('selected');
+                        updateIndividualHint(controlKey, presetValue);
+                    }
+                } else if (controlKey === "使用カメラの雰囲気") {
+                    const brandRadio = document.getElementById(`${controlKey}-${presetValue}`);
+                    if (brandRadio) {
+                        brandRadio.checked = true;
+                        currentSelections[controlKey] = presetValue;
+                        const modelKey = presetData.selections["カメラ機種"];
+                        if (modelKey) {
+                            currentSelections["カメラ機種"] = modelKey;
+                            renderCameraModels(presetValue); // Re-render models for the selected brand
+                            const modelRadio = document.getElementById(`カメラ機種-${modelKey}`);
+                            if (modelRadio) {
+                                modelRadio.checked = true;
+                                updateCameraModelHint(modelKey, presetValue);
+                            }
+                        }
+                    }
+                } else if (controlData.type === 'slider') {
+                    const slider = document.querySelector(`input[name="${controlKey}"]`);
+                    if (slider) {
+                        slider.value = presetValue;
+                    }
+                }
+            }
+            generatePrompt();
+        }
+
+
+        function updatePrompt(event) {
+            const controlKey = event.target.name;
+            const value = event.target.value;
+            let controlData = null;
+            let sectionOfControl = null;
+
+            for (const sectionKey in styleConfig) {
+                if (styleConfig[sectionKey][controlKey]) {
+                    controlData = styleConfig[sectionKey][controlKey];
+                    sectionOfControl = sectionKey;
+                    break;
+                }
+            }
+
+            if (!controlData) return;
+
+            const type = controlData.type;
+
+            if (type === 'radio' || type === 'select' || type === 'slider' || type === 'radio-with-hint') {
+                currentSelections[controlKey] = value;
+                updateIndividualHint(controlKey, value);
+            } else if (type === 'checkbox' || type === 'checkbox-with-hint') {
+                if (event.target.checked) {
+                    currentSelections[controlKey].push(value);
+                    updateIndividualHint(controlKey, value);
+                } else {
+                    currentSelections[controlKey] = currentSelections[controlKey].filter(item => item !== value);
+                    if (currentSelections[controlKey].length === 0) {
+                        const hintPanel = document.getElementById(`${controlKey}-hint`);
+                        if (hintPanel) {
+                            hintPanel.innerHTML = '';
+                            hintPanel.classList.add('hidden');
+                        }
+                    } else {
+                        const hintPanel = document.getElementById(`${controlKey}-hint`);
+                        if (hintPanel) {
+                            hintPanel.innerHTML = '';
+                            hintPanel.classList.add('hidden');
+                        }
+                    }
+                }
+            } else if (type === 'visual-button') {
+                currentSelections[controlKey] = value;
+                updateIndividualHint(controlKey, value);
+            }
+            generatePrompt();
+        }
+
+        function generatePrompt() {
+            let promptParts = [];
+
+            // Get base prompt text from the textarea
+            const currentBasePromptText = basePromptInput.value.trim();
+            if (currentBasePromptText !== "") {
+                promptParts.push(currentBasePromptText);
+            }
+
+            let aspectRatioPrompt = '';
+            let selectedRatio = null;
+
+            for (const sectionKey in styleConfig) {
+                const sectionData = styleConfig[sectionKey];
+                // Skip presets section when generating prompt parts from selections
+                if (sectionKey === "プリセット") continue;
+
+                for (const controlKey in sectionData) {
+                    const selectedValue = currentSelections[controlKey];
+                    const controlData = sectionData[controlKey];
+
+                    if (controlKey === "アスペクト比") {
+                        const selectedOption = controlData.options[selectedValue];
+                        aspectRatioPrompt = selectedOption.prompt;
+                        selectedRatio = selectedOption.ratio;
+                        if (aspectRatioLabel) {
+                            aspectRatioLabel.textContent = selectedOption.label;
+                        }
+                    } else if (controlKey === "使用カメラの雰囲気") {
+                        const selectedBrandKey = currentSelections["使用カメラの雰囲気"];
+                        const selectedModelKey = currentSelections["カメラ機種"];
+
+                        if (selectedBrandKey && selectedModelKey) {
+                            const brandOptions = styleConfig["写真の表現と視覚効果"]["使用カメラの雰囲気"].options;
+                            const brandData = brandOptions[selectedBrandKey];
+                            if (brandData && brandData.models && brandData.models[selectedModelKey]) {
+                                promptParts.push(brandData.models[selectedModelKey].prompt);
+                            } else if (brandData) {
+                                promptParts.push(brandData.prompt);
+                            }
+                        }
+                    } else if (controlData.type === "visual-button") {
+                        const selectedOption = controlData.options.find(opt => opt.key === selectedValue);
+                        if (selectedOption) {
+                            promptParts.push(selectedOption.prompt);
+                        }
+                    } else if (controlData.type === "radio-with-hint") {
+                        const selectedOption = controlData.options[selectedValue];
+                        if (selectedOption && selectedOption.prompt) {
+                            promptParts.push(selectedOption.prompt);
+                        }
+                    } else if (controlData.type === "checkbox-with-hint") {
+                        if (Array.isArray(selectedValue) && selectedValue.length > 0) {
+                            const selectedPrompts = selectedValue.map(optKey => controlData.options[optKey].prompt);
+                            promptParts.push(selectedPrompts.join(', '));
+                        }
+                    }
+                    else if (controlData.type === "checkbox") {
+                        if (Array.isArray(selectedValue) && selectedValue.length > 0) {
+                            promptParts.push(selectedValue.map(opt => controlData.options[opt]).join(', '));
+                        }
+                    } else {
+                        if (selectedValue && controlData.options[selectedValue]) {
+                            promptParts.push(controlData.options[selectedValue]);
+                        }
+                    }
+                }
+            }
+
+            if (aspectRatioBox && selectedRatio) {
+                const containerWidth = 190;
+                const containerHeight = 140;
+
+                let displayWidth, displayHeight;
+
+                const ratioValue = selectedRatio.width / selectedRatio.height;
+                const containerRatio = containerWidth / containerHeight;
+
+                if (ratioValue > containerRatio) {
+                    displayWidth = containerWidth;
+                    displayHeight = containerWidth / ratioValue;
+                } else {
+                    displayHeight = containerHeight;
+                    displayWidth = containerHeight * ratioValue;
+                }
+
+                aspectRatioBox.style.width = `${displayWidth}px`;
+                aspectRatioBox.style.height = `${displayHeight}px`;
+            }
+
+            let finalPrompt = promptParts.filter(part => part !== '').join(', ');
+            finalPrompt += ' --v 6.0 --style raw --q 0.7';
+
+            if (aspectRatioPrompt) {
+                finalPrompt += ` ${aspectRatioPrompt}`;
+            }
+
+            promptOutput.textContent = finalPrompt;
+
+            // 選択状態の更新 (初期ロード時と変更時に適用)
+            const lightingButtons = document.querySelectorAll('.lighting-visual-button-group .visual-button');
+            lightingButtons.forEach(button => {
+                if (button.dataset.key === currentSelections["光の当たり方"]) {
+                    button.classList.add('selected');
+                } else {
+                    button.classList.remove('selected');
+                }
+            });
+        }
+
+        copyButton.addEventListener('click', () => {
+            const textToCopy = promptOutput.textContent;
+            if (textToCopy && textToCopy !== 'ここにプロンプトが表示されます。') {
+                document.execCommand('copy');
+                showMessage('プロンプトがコピーされました！');
+            } else {
+                showMessage('コピーするプロンプトがありません。', true);
+            }
+        });
+
+        document.addEventListener('copy', (event) => {
+            if (event.target === document.body) {
+                const textToCopy = promptOutput.textContent;
+                if (textToCopy && textToCopy !== 'ここにプロンプトが表示されます。') {
+                    event.clipboardData.setData('text/plain', textToCopy);
+                    event.preventDefault();
+                }
+            }
+        });
+
+        // Add event listener for base prompt input
+        basePromptInput.addEventListener('input', generatePrompt);
+
+        renderControls();
+        // Initial application of default preset
+        applyPreset(styleConfig["プリセット"].default);
+    </script>
+</body>
+</html>
+
