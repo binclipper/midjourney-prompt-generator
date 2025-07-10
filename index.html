@@ -748,8 +748,6 @@
         const copyButton = document.getElementById('copy-button');
         const messageBox = document.getElementById('message-box');
         const basePromptInput = document.getElementById('base-prompt-input'); // Base prompt input
-        // basePromptText は直接更新せず、textarea の値から取得するように変更
-        // let basePromptText = ""; // State for base prompt text
 
         let aspectRatioBox = null;
         let aspectRatioLabel = null;
@@ -1488,7 +1486,8 @@
             }
 
             let finalPrompt = promptParts.filter(part => part !== '').join(', ');
-            finalPrompt += ' --v 6.0 --style raw --q 0.7';
+            // Removed --v 6.0
+            finalPrompt += ' --style raw --q 0.7';
 
             if (aspectRatioPrompt) {
                 finalPrompt += ` ${aspectRatioPrompt}`;
